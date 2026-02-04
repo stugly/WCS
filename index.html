@@ -5,103 +5,120 @@
     <link rel="stylesheet" href="https://stugly.github.io/substation/style.css">
     <style>
       :root { --primary-color: var(--line-green); }
-      body { padding: 15px; background-color: #f4f7f6; }
-      .form-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-      .preview-box { width: 100%; max-width: 200px; margin-top: 10px; border-radius: 8px; display: none; }
-      .btn-submit { background-color: var(--line-green) !important; width: 100%; padding: 12px; font-size: 1.1rem; }
+      body { background-color: #f8f9fa; padding: 10px; }
+      .main-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+      .header-title { color: var(--line-green); text-align: center; margin-bottom: 20px; font-weight: bold; }
+      .input-group { margin-bottom: 15px; }
+      .btn-submit { background-color: var(--line-green) !important; color: white; width: 100%; font-size: 1.2rem; cursor: pointer; border: none; padding: 10px; border-radius: 5px; }
+      .btn-submit:disabled { background-color: #ccc !important; }
+      #loading { display: none; text-align: center; color: #666; margin-top: 10px; }
     </style>
   </head>
   <body>
-    <div class="container form-card">
-      <h2 style="color: var(--line-green); text-align: center;">🌿 บันทึกกำจัดวัชพืช</h2>
-      <hr>
+
+    <div class="main-card">
+      <h2 class="header-title">🌿 ระบบติดตามการกำจัดวัชพืช</h2>
+      
       <form id="weedForm">
-        <label>รหัสพนักงาน (UID):</label>
-        <input type="text" name="uid" id="uid" required placeholder="เช่น 001">
+        <div class="input-group">
+          <label>รหัสพนักงาน (UID):</label>
+          <input type="text" id="uid" required placeholder="กรอกรหัสพนักงาน">
+        </div>
 
-        <label>เลือกสถานี:</label>
-        <select name="station" id="stationSelect" required>
-          <option value="">-- กำลังโหลดสถานี --</option>
-        </select>
+        <div class="input-group">
+          <label>เลือกสถานี (สังกัดหน่วยงาน):</label>
+          <select id="stationSelect" required>
+            <option value="">-- กำลังโหลดข้อมูลสถานี --</option>
+          </select>
+        </div>
 
-        <label>รอบการดำเนินงาน:</label>
-        <select name="round" required>
-          <option value="1">รอบที่ 1 (กุมภาพันธ์)</option>
-          <option value="2">รอบที่ 2 (เมษายน)</option>
-          <option value="3">รอบที่ 3 (มิถุนายน)</option>
-          <option value="4">รอบที่ 4 (สิงหาคม)</option>
-          <option value="5">รอบที่ 5 (ตุลาคม)</option>
-          <option value="6">รอบที่ 6 (ธันวาคม)</option>
-        </select>
+        <div class="input-group">
+          <label>รอบการดำเนินงาน (ปี 2026):</label>
+          <select id="roundSelect" required>
+            <option value="1">รอบที่ 1 (กุมภาพันธ์)</option>
+            <option value="2">รอบที่ 2 (เมษายน)</option>
+            <option value="3">รอบที่ 3 (มิถุนายน)</option>
+            <option value="4">รอบที่ 4 (สิงหาคม)</option>
+            <option value="5">รอบที่ 5 (ตุลาคม)</option>
+            <option value="6">รอบที่ 6 (ธันวาคม)</option>
+          </select>
+        </div>
 
-        <div style="margin-top: 15px;">
+        <div class="input-group">
           <label>📷 รูปก่อนทำ (Before):</label>
-          <input type="file" name="fileBefore" accept="image/*" required id="imgBefore">
+          <input type="file" id="imgBefore" accept="image/*" required>
         </div>
 
-        <div style="margin-top: 15px; margin-bottom: 20px;">
+        <div class="input-group">
           <label>📷 รูปหลังทำ (After):</label>
-          <input type="file" name="fileAfter" accept="image/*" required id="imgAfter">
+          <input type="file" id="imgAfter" accept="image/*" required>
         </div>
 
-        <button type="submit" class="btn-submit" id="submitBtn">บันทึกข้อมูล</button>
+        <button type="submit" id="submitBtn" class="btn-submit">ส่งรายงาน</button>
       </form>
-      <div id="loader" style="display:none; text-align:center; margin-top:10px;">กำลังอัปโหลด...</div>
+      <div id="loading">⏳ กำลังประมวลผลและอัปโหลดรูปภาพ...</div>
     </div>
 
     <script>
-      // โหลดรายชื่อสถานีจากชีต Stations
-      google.script.run.withSuccessHandler(stations => {
+      // 1. โหลดข้อมูลสถานี + Unit
+      google.script.run.withSuccessHandler(list => {
         const select = document.getElementById('stationSelect');
         select.innerHTML = '<option value="">-- เลือกสถานี --</option>';
-        stations.forEach(s => {
+        list.forEach(item => {
           let opt = document.createElement('option');
-          opt.value = s; opt.innerHTML = s;
+          opt.value = item;
+          opt.innerHTML = item;
           select.appendChild(opt);
         });
       }).getStations();
 
-      // จัดการการส่งฟอร์ม
-      const form = document.getElementById('weedForm');
-      form.onsubmit = function(e) {
+      // 2. จัดการส่งข้อมูล
+      document.getElementById('weedForm').onsubmit = async function(e) {
         e.preventDefault();
-        document.getElementById('submitBtn').disabled = true;
-        document.getElementById('loader').style.display = 'block';
+        const btn = document.getElementById('submitBtn');
+        const loader = document.getElementById('loading');
+        
+        btn.disabled = true;
+        loader.style.display = 'block';
 
-        const fileBefore = document.getElementById('imgBefore').files[0];
-        const fileAfter = document.getElementById('imgAfter').files[0];
+        const file1 = document.getElementById('imgBefore').files[0];
+        const file2 = document.getElementById('imgAfter').files[0];
 
-        // อ่านไฟล์เป็น Blob เพื่อส่งไปยังฝั่ง Server
-        const readerBefore = new FileReader();
-        readerBefore.onload = function(e1) {
-          const readerAfter = new FileReader();
-          readerAfter.onload = function(e2) {
-            const formData = {
-              uid: document.getElementById('uid').value,
-              station: form.station.value,
-              round: form.round.value,
-              fileBefore: {
-                data: e1.target.result.split(',')[1],
-                mimeType: fileBefore.type,
-                name: fileBefore.name
-              },
-              fileAfter: {
-                data: e2.target.result.split(',')[1],
-                mimeType: fileAfter.type,
-                name: fileAfter.name
-              }
-            };
-            
-            google.script.run.withSuccessHandler(res => {
-              alert(res.message);
-              if(res.status === "success") form.reset();
-              document.getElementById('submitBtn').disabled = false;
-              document.getElementById('loader').style.display = 'none';
-            }).processForm(formData);
+        // ฟังก์ชันอ่านไฟล์เป็น Base64
+        const toBase64 = file => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve({
+            data: reader.result.split(',')[1],
+            mimeType: file.type
+          });
+          reader.onerror = error => reject(error);
+        });
+
+        try {
+          const base64Before = await toBase64(file1);
+          const base64After = await toBase64(file2);
+
+          const payload = {
+            uid: document.getElementById('uid').value,
+            station: document.getElementById('stationSelect').value,
+            round: document.getElementById('roundSelect').value,
+            fileBefore: base64Before,
+            fileAfter: base64After
           };
-          readerAfter.readAsDataURL(fileAfter);
-        };
-        readerBefore.readAsDataURL(fileBefore);
+
+          google.script.run.withSuccessHandler(res => {
+            alert(res.message);
+            if(res.status === "success") document.getElementById('weedForm').reset();
+            btn.disabled = false;
+            loader.style.display = 'none';
+          }).processForm(payload);
+
+        } catch (err) {
+          alert("เกิดข้อผิดพลาดในการอ่านไฟล์");
+          btn.disabled = false;
+          loader.style.display = 'none';
+        }
       };
     </script>
   </body>
