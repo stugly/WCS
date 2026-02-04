@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://stugly.github.io/substation/style.css">
+    <style>
+      :root { --primary-color: var(--line-green); }
+      body { padding: 15px; background-color: #f4f7f6; }
+      .form-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .preview-box { width: 100%; max-width: 200px; margin-top: 10px; border-radius: 8px; display: none; }
+      .btn-submit { background-color: var(--line-green) !important; width: 100%; padding: 12px; font-size: 1.1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="container form-card">
+      <h2 style="color: var(--line-green); text-align: center;">🌿 บันทึกกำจัดวัชพืช</h2>
+      <hr>
+      <form id="weedForm">
+        <label>รหัสพนักงาน (UID):</label>
+        <input type="text" name="uid" id="uid" required placeholder="เช่น 001">
+
+        <label>เลือกสถานี:</label>
+        <select name="station" id="stationSelect" required>
+          <option value="">-- กำลังโหลดสถานี --</option>
+        </select>
+
+        <label>รอบการดำเนินงาน:</label>
+        <select name="round" required>
+          <option value="1">รอบที่ 1 (กุมภาพันธ์)</option>
+          <option value="2">รอบที่ 2 (เมษายน)</option>
+          <option value="3">รอบที่ 3 (มิถุนายน)</option>
+          <option value="4">รอบที่ 4 (สิงหาคม)</option>
+          <option value="5">รอบที่ 5 (ตุลาคม)</option>
+          <option value="6">รอบที่ 6 (ธันวาคม)</option>
+        </select>
+
+        <div style="margin-top: 15px;">
+          <label>📷 รูปก่อนทำ (Before):</label>
+          <input type="file" name="fileBefore" accept="image/*" required id="imgBefore">
+        </div>
+
+        <div style="margin-top: 15px; margin-bottom: 20px;">
+          <label>📷 รูปหลังทำ (After):</label>
+          <input type="file" name="fileAfter" accept="image/*" required id="imgAfter">
+        </div>
+
+        <button type="submit" class="btn-submit" id="submitBtn">บันทึกข้อมูล</button>
+      </form>
+      <div id="loader" style="display:none; text-align:center; margin-top:10px;">กำลังอัปโหลด...</div>
+    </div>
+
+    <script>
+      // โหลดรายชื่อสถานีจากชีต Stations
+      google.script.run.withSuccessHandler(stations => {
+        const select = document.getElementById('stationSelect');
+        select.innerHTML = '<option value="">-- เลือกสถานี --</option>';
+        stations.forEach(s => {
+          let opt = document.createElement('option');
+          opt.value = s; opt.innerHTML = s;
+          select.appendChild(opt);
+        });
+      }).getStations();
+
+      // จัดการการส่งฟอร์ม
+      const form = document.getElementById('weedForm');
+      form.onsubmit = function(e) {
+        e.preventDefault();
+        document.getElementById('submitBtn').disabled = true;
+        document.getElementById('loader').style.display = 'block';
+
+        const fileBefore = document.getElementById('imgBefore').files[0];
+        const fileAfter = document.getElementById('imgAfter').files[0];
+
+        // อ่านไฟล์เป็น Blob เพื่อส่งไปยังฝั่ง Server
+        const readerBefore = new FileReader();
+        readerBefore.onload = function(e1) {
+          const readerAfter = new FileReader();
+          readerAfter.onload = function(e2) {
+            const formData = {
+              uid: document.getElementById('uid').value,
+              station: form.station.value,
+              round: form.round.value,
+              fileBefore: {
+                data: e1.target.result.split(',')[1],
+                mimeType: fileBefore.type,
+                name: fileBefore.name
+              },
+              fileAfter: {
+                data: e2.target.result.split(',')[1],
+                mimeType: fileAfter.type,
+                name: fileAfter.name
+              }
+            };
+            
+            google.script.run.withSuccessHandler(res => {
+              alert(res.message);
+              if(res.status === "success") form.reset();
+              document.getElementById('submitBtn').disabled = false;
+              document.getElementById('loader').style.display = 'none';
+            }).processForm(formData);
+          };
+          readerAfter.readAsDataURL(fileAfter);
+        };
+        readerBefore.readAsDataURL(fileBefore);
+      };
+    </script>
+  </body>
+</html>
